@@ -1,0 +1,137 @@
+1. create venv -> python3 -m venv elk
+
+2. add elk directory to .gitignore, So that you donot acidently push to git.
+
+3. start minikube -> minikube start --cpus=4 --memory=6837
+
+4. Deploy the Elastic Cloud on Kubernetes (ECK) Operator 
+   (The ECK operator simplifies deploying Elasticsearch, Kibana, and Logstash.)
+      kubectl create namespace elastic-system
+      kubectl apply -f https://download.elastic.co/downloads/eck/2.11.0/crds.yaml
+      kubectl apply -f https://download.elastic.co/downloads/eck/2.11.0/operator.yaml
+
+5. check pods for upand running state -> kubectl get pods -n elastic-system
+      # Check available CRDs
+      kubectl get crd | grep logstash
+
+      # Check api version
+      kubectl api-resources | grep logstash
+
+6. Deploy Elasticsearch -> kubectl apply -f dev/elasticsearch.yaml
+
+7. Deploy Kibana -> kubectl apply -f dev/kibana.yaml
+   exposing port -> kubectl port-forward service/kibana-kb-http 5601
+   get login password -> kubectl get secret elastic-cluster-es-elastic-user -n default -o go-template='{{.data.elastic | base64decode}}{{"\n"}}'
+
+   Username: elastic
+   Password: <that password>
+
+8. Deploy Logstash -> kubectl apply -f dev/logstash.yaml
+
+9. docker build -t bharat9838/elk-flask-app:latest .
+docker push bharat9838/elk-flask-app:latest
+
+10. Deploy app -> kubectl apply -f dev/deployment.yaml  
+11. Run or test our app -> kubectl port-forward service/myapp-service 5050:5050
+
+12. kubectl get pods -n default -l common.k8s.elastic.co/type=logstash
+13. export ES_PASSWORD=$(kubectl get secret elastic-cluster-es-elastic-user -o go-template='{{.data.elastic | base64decode}}')
+14. kubectl set env statefulset/logstash-ls ES_PASSWORD="$ES_PASSWORD"
+15. kubectl exec -it logstash-ls-0 -n default -- printenv | grep ES_PASSWORD
+16. kubectl rollout restart statefulset/logstash-ls
+
+17. kubectl get secret elastic-cluster-es-elastic-user -o go-template='{{.data.elastic | base64decode}}'
+18. export ES_PASSWORD='copy password from above'
+
+19. curl -k -u "elastic:$ES_PASSWORD" "https://localhost:9200/flask-logs-*/_search?pretty"
+    
+    you will see :
+    {
+    "took" : 4,
+    "timed_out" : false,
+    "_shards" : {
+        "total" : 0,
+        "successful" : 0,
+        "skipped" : 0,
+        "failed" : 0
+    },
+    "hits" : {
+        "total" : {
+        "value" : 0,
+        "relation" : "eq"
+        },
+        "max_score" : 0.0,
+        "hits" : [ ]
+    }
+    }
+
+20. Check Index created: curl -k -u "elastic:$ES_PASSWORD" "https://localhost:9200/_cat/indices?v&s=index"
+
+health status index                                                              uuid                   pri rep docs.count docs.deleted store.size pri.store.size dataset.size
+green  open   .internal.alerts-observability.logs.alerts-default-000001          w0tayInPFu-KnOoA       1   0          0            0       249b           249b         249b
+green  open   .internal.alerts-default.alerts-default-000001                                            1   0          0            0       249b           249b         249b
+green  open   .internal.alerts-ml.anomaly-detection-health.alerts-default-000001 0QRQEOTU               1   0          0            0       249b           249b         249b
+green  open   .internal.alerts-ml.anomaly-detection.alerts-default-000001        Qx5OuRrpdvGOzoQ        1   0          0            0       249b           249b         249b
+green  open   .internal.alerts-observability.apm.alerts-default-000001           cbarHh-6kSsKg          1   0          0            0       249b           249b         249b
+green  open   .internal.alerts-observability.logs.alerts-default-000001          w0tayInPFu-KnOoA       1   0          0            0       249b           249b         249b
+green  open   .internal.alerts-observability.metrics.alerts-default-000001       PE4XQBqdLwG7up0zAA     1   0          0            0       249b           249b         249b
+green  open   .internal.alerts-observability.slo.alerts-default-000001           Y4u0YYG-TpdfI6w        1   0          0            0       249b           249b         249b
+green  open   .internal.alerts-observability.threshold.alerts-default-000001     eowFwg4DQRWBBcfNnJwA   1   0          0            0       249b           249b         249b
+green  open   .internal.alerts-observability.uptime.alerts-default-000001        JZW_UqVMdRdQ           1   0          0            0       249b           249b         249b
+green  open   .internal.alerts-security.alerts-default-000001                    EedKRI7Kwoaa6rg        1   0          0            0       249b           249b         249b
+green  open   .internal.alerts-stack.alerts-default-000001                       WOpQVGQPqXDfOA         1   0          0            0       249b           249b         249b
+green  open   .internal.alerts-transform.health.alerts-default-000001            zU2F0MQX607dw          1   0          0            0       249b           249b         249b
+green  open   .kibana-observability-ai-assistant-conversations-000001            SdA4Rq_hbkpA           1   0          0            0       249b           249b         249b
+green  open   .kibana-observability-ai-assistant-kb-000001                       TVAvLBtJXQ             1   0          0            0       249b           249b         249b
+yellow open   flask-logs-                                                        PK2bNK91A              1   1          0            0       227b           227b         227b
+
+Verify Count: curl -k -u "elastic:$ES_PASSWORD" "https://localhost:9200/flask-logs-/_count"
+
+{"count":0,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0}}%                                            
+
+
+
+Apply test log entry -> curl -k -u "elastic:$ES_PASSWORD" -X POST "https://localhost:9200/flask-logs-000001/_doc" -H 'Content-Type: application/json' -d'
+
+It should show output like below
+
+{
+  "message": "Test log entry",
+  "@timestamp": "2025-08-12T00:00:00Z",
+  "event": "test_event"
+}
+
+
+{"_index":"flask-logs-000001","_id":"ZhvynJgBmv7tQCkAUNY9","_version":1,"result":"created","_shards":{"total":2,"successful":1,"failed":0},"_seq_no":0,"_primary_term":1}%                                                              
+(elk) ➜  elk_stack_project git:(main) ✗ curl -k -u "elastic:$ES_PASSWORD" "https://localhost:9200/flask-logs-*/_search?pretty"
+
+{
+  "took" : 24,
+  "timed_out" : false,
+  "_shards" : {
+    "total" : 2,
+    "successful" : 2,
+    "skipped" : 0,
+    "failed" : 0
+  },
+  "hits" : {
+    "total" : {
+      "value" : 1,
+      "relation" : "eq"
+    },
+    "max_score" : 1.0,
+    "hits" : [
+      {
+        "_index" : "flask-logs-000001",
+        "_id" : "ZhvynJgBmv7tQCkAUNY9",
+        "_score" : 1.0,
+        "_source" : {
+          "message" : "Test log entry",
+          "@timestamp" : "2025-08-12T00:00:00Z",
+          "event" : "test_event"
+        }
+      }
+    ]
+  }
+}
+(elk) ➜  elk_stack_project git:(main) ✗ 

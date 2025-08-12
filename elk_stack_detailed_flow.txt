@@ -1,0 +1,100 @@
+
+ELK Stack Setup on Kubernetes with ECK Operator — Step-by-Step Guide
+
+1. Create Python Virtual Environment
+   python3 -m venv elk
+   - Creates a new Python virtual environment named 'elk' to isolate dependencies.
+
+2. Add Virtual Environment Directory to .gitignore
+   - Add the directory 'elk/' to .gitignore to avoid committing virtual environment files to Git.
+
+3. Start Minikube Kubernetes Cluster
+   minikube start --cpus=4 --memory=6837
+   - Starts a local Kubernetes cluster with 4 CPUs and ~6.8 GB RAM allocated.
+
+4. Deploy Elastic Cloud on Kubernetes (ECK) Operator
+   kubectl create namespace elastic-system
+   kubectl apply -f https://download.elastic.co/downloads/eck/2.11.0/crds.yaml
+   kubectl apply -f https://download.elastic.co/downloads/eck/2.11.0/operator.yaml
+   - Creates namespace for ECK, installs CRDs and deploys the ECK Operator.
+
+5. Verify ECK Operator is Running
+   kubectl get pods -n elastic-system
+   - Check if operator pods are running.
+
+   kubectl get crd | grep logstash
+   kubectl api-resources | grep logstash
+   - Verify CRDs and API resources related to Logstash.
+
+6. Deploy Elasticsearch Cluster
+   kubectl apply -f dev/elasticsearch.yaml
+   - Deploy Elasticsearch StatefulSet and Service.
+
+7. Deploy Kibana UI
+   kubectl apply -f dev/kibana.yaml
+   - Deploy Kibana for visualization.
+
+   kubectl port-forward service/kibana-kb-http 5601
+   - Forward Kibana port to localhost:5601.
+
+   kubectl get secret elastic-cluster-es-elastic-user -n default -o go-template='{{.data.elastic | base64decode}}{{"\n"}}'
+   - Retrieve elastic user password for Kibana login.
+
+8. Deploy Logstash
+   kubectl apply -f dev/logstash.yaml
+   - Deploy Logstash pods to collect and ship logs.
+
+9. Build & Push Flask App Docker Image
+   docker build -t bharat9838/elk-flask-app:latest .
+   docker push bharat9838/elk-flask-app:latest
+   - Build and push Flask app image to Docker Hub.
+
+10. Deploy Flask App in Kubernetes
+    kubectl apply -f dev/deployment.yaml
+    - Deploy Flask app deployment and service.
+
+    kubectl port-forward service/myapp-service 5050:5050
+    - Forward Flask app port to localhost:5050 for testing.
+
+11. Verify Logstash Pods Are Running
+    kubectl get pods -n default -l common.k8s.elastic.co/type=logstash
+    - List Logstash pods by label.
+
+12. Manage Elasticsearch Password Environment for Logstash
+    export ES_PASSWORD=$(kubectl get secret elastic-cluster-es-elastic-user -o go-template='{{.data.elastic | base64decode}}')
+    kubectl set env statefulset/logstash-ls ES_PASSWORD="$ES_PASSWORD"
+    kubectl exec -it logstash-ls-0 -n default -- printenv | grep ES_PASSWORD
+    kubectl rollout restart statefulset/logstash-ls
+    - Export ES password, set it in Logstash environment, verify, and restart Logstash pods.
+
+13. Verify Elasticsearch Indices and Data
+    curl -k -u "elastic:$ES_PASSWORD" "https://localhost:9200/_cat/indices?v"
+    - List all Elasticsearch indices.
+
+    curl -k -u "elastic:$ES_PASSWORD" "https://localhost:9200/flask-logs-*/_search?pretty"
+    - Search logs in flask-logs indices.
+
+14. Insert a Test Log Document Manually (Optional)
+    curl -k -u "elastic:$ES_PASSWORD" -X POST "https://localhost:9200/flask-logs-000001/_doc" -H 'Content-Type: application/json' -d'
+    {
+      "message": "Test log entry",
+      "@timestamp": "2025-08-12T00:00:00Z",
+      "event": "test_event"
+    }
+    '
+    - Insert test log entry manually.
+
+    curl -k -u "elastic:$ES_PASSWORD" "https://localhost:9200/flask-logs-*/_search?pretty"
+    - Verify inserted document is searchable.
+
+Troubleshooting Notes:
+- The curl error about invalid port usually means the URL or port format is wrong. Replace placeholders like <logstash-host>:<port> with actual hostname and port number.
+
+Summary Flow:
+1. Setup Kubernetes with Minikube.
+2. Deploy ECK operator.
+3. Deploy Elasticsearch, Kibana, Logstash.
+4. Deploy Flask app sending logs.
+5. Configure Logstash with ES password.
+6. Verify logs are indexed and searchable.
+7. Use Kibana UI for visualization.

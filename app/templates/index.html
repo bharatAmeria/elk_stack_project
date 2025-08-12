@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>House Price Predictor</title>
+
+    <!-- Bootstrap RTL CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.rtl.min.css" integrity="sha384-Xbg45MqvDIk1e563NLpGEulpX6AvL404DP+/iCgW9eFa2BqztiwTexswJo2jLMue" crossorigin="anonymous">
+  </head>
+  <body class="bg-dark text-white">
+
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="card mt-5">
+          <div class="card-header text-center">
+            <h1>Welcome to House Price Predictor</h1>
+          </div>
+          <div class="card-body">
+            <form method="post" onsubmit="send_data(event)">
+              <div class="row g-3">
+
+                <!-- Location -->
+                <div class="col-md-6 text-center">
+                  <label for="location"><b>Select Location:</b></label>
+                  <select class="form-control" name="location" id="location" required>
+                    {% for location in locations %}
+                    <option value="{{location}}">{{location}}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <!-- BHK -->
+                <div class="col-md-6 text-center">
+                  <label for="bhk"><b>Enter BHK:</b></label>
+                  <input class="form-control" type="number" name="bhk" id="bhk" placeholder="Enter BHK" required>
+                </div>
+
+                <!-- Bathrooms -->
+                <div class="col-md-6 text-center">
+                  <label for="bath"><b>Enter Number of Bathrooms:</b></label>
+                  <input class="form-control" type="number" name="bath" id="bath" placeholder="Enter number of bathrooms" required>
+                </div>
+
+                <!-- Square Feet -->
+                <div class="col-md-6 text-center">
+                  <label for="total_sqft"><b>Enter Square Feet:</b></label>
+                  <input class="form-control" type="number" name="total_sqft" id="total_sqft" placeholder="Enter Square Feet" required>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="col-md-12">
+                  <button class="btn btn-primary w-100" type="submit">Predict Price</button>
+                </div>
+
+                <!-- Prediction Result -->
+                <div class="col-md-12 text-center mt-3">
+                  <h3><span id="prediction"></span></h3>
+                </div>
+
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JS Script -->
+    <script>
+      function send_data(event) {
+        event.preventDefault();
+
+        const form = document.querySelector('form');
+        const fd = new FormData(form);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/predict', true);
+
+        document.getElementById("prediction").innerText = "Please wait...";
+
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState === XMLHttpRequest.DONE) {
+            document.getElementById('prediction').innerText = "Prediction: ₹" + xhr.responseText;
+          }
+        };
+
+        xhr.send(fd);
+      }
+    </script>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.min.js" integrity="sha384-7qAoOXltbVP82dhxHAUje59V5r2YsVfBafyUDxEdApLPmcdhBPg1DKg1ERo0BZlK" crossorigin="anonymous"></script>
+  </body>
+</html>
